@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>沖繩4+1日行程地圖（Google版）</title>
+<style>
+:root{--bg:#101418;--panel:#1a2027;--card:#232b34;--text:#e8eaed;--muted:#9aa3ad;--line:#2e3845;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Noto Sans TC",-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+header{display:flex;gap:8px;padding:12px 14px;flex-wrap:wrap;background:var(--bg);z-index:1000;}
+.chip{border:1px solid var(--line);background:var(--panel);color:var(--muted);padding:8px 18px;border-radius:20px;cursor:pointer;font-size:14px;font-weight:500;}
+.chip:focus-visible{outline:2px solid #fff;outline-offset:2px;}
+.chip.on{background:#f5f3ee;color:#15191e;border-color:#f5f3ee;}
+main{flex:1;display:flex;min-height:0;}
+#map{flex:1;min-height:0;}
+aside{width:360px;background:var(--panel);overflow-y:auto;padding:16px;border-left:1px solid var(--line);}
+.eyebrow{font-size:11px;letter-spacing:.14em;color:var(--muted);margin-bottom:2px;}
+h1{font-size:21px;font-weight:700;margin-bottom:4px;}
+.route-sub{font-size:13px;color:var(--muted);margin-bottom:12px;}
+.gbtn{display:inline-flex;align-items:center;gap:6px;background:#f5f3ee;color:#15191e;border:none;border-radius:18px;padding:8px 16px;font-size:13.5px;font-weight:600;cursor:pointer;text-decoration:none;margin-bottom:16px;}
+.stop{background:var(--card);border-radius:12px;padding:12px 14px;margin-bottom:10px;display:flex;gap:12px;cursor:pointer;border:1px solid transparent;}
+.stop:hover{border-color:var(--line);}
+.badge{flex:none;width:26px;height:26px;border-radius:50%;color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:2px;}
+.stop .t{font-size:12.5px;color:var(--muted);}
+.stop .n{font-size:15px;font-weight:600;margin:1px 0 3px;}
+.stop .d{font-size:12.5px;color:var(--muted);line-height:1.55;}
+.stop .d .warn{color:#f0a25e;}
+footer{padding:8px 14px;font-size:11.5px;color:var(--muted);background:var(--bg);border-top:1px solid var(--line);}
+@media (max-width:760px){main{flex-direction:column;}aside{width:100%;max-height:46vh;border-left:none;border-top:1px solid var(--line);}}
+</style>
+</head>
+<body>
+<header id="tabs" role="tablist" aria-label="行程天數"></header>
+<main>
+  <div id="map"></div>
+  <aside>
+    <div class="eyebrow" id="day-eyebrow"></div>
+    <h1 id="day-title"></h1>
+    <div class="route-sub" id="day-route"></div>
+    <a class="gbtn" id="nav-link" target="_blank" rel="noopener">➤ 開啟Google Maps導航</a>
+    <div id="stops"></div>
+  </aside>
+</main>
+<footer>路線由Google Directions計算之實際行車路徑；點擊行程卡片可定位該停點。v4定版 8/24–8/28。</footer>
+<script>
+const API_KEY="AIzaSyBTAKX_Gh2CWorwU_NCJGZyjz2U3oFmW6Y"; // ←你的金鑰，外流時到Cloud Console重新產生
+const DAYS=[
+{label:"Day 1",date:"8/24（一）",title:"落地日:機場→北谷",route:"那霸機場 → 安良波 → 北谷(宿)",color:"#7F77DD",stops:[
+{t:"14:40",n:"那霸機場 落地",d:"領車含接駁手續抓2小時,17:00前上路",lat:26.20013,lng:127.64665},
+{t:"17:45",n:"安良波公園",d:"海盜船遊具放電1小時",lat:26.30417,lng:127.75904},
+{t:"18:20",n:"Sunset Beach 夕陽",d:"日落18:50",lat:26.31350,lng:127.75530},
+{t:"19:15",n:"美國村 晚餐(宿北谷)",d:"早點回飯店休息。雨備:AEON Rycom",lat:26.31588,lng:127.75401}]},
+{label:"Day 2",date:"8/25(二)",title:"西岸北上:水上第一場",route:"北谷 → 萬座 → 恩納 → 名護(宿)",color:"#1D9E75",stops:[
+{t:"10:45",n:"萬座Ocean Park【第一場】",d:"3歲以上。<span class=warn>線上預約場次+查當日潮汐表</span>,退潮時段停開",lat:26.50830,lng:127.85810},
+{t:"13:15",n:"おんなの駅 午餐",d:"水果剉冰。在萬座南側,吃完再北上。選配:残波岬公園繞15分",lat:26.43632,lng:127.79471},
+{t:"15:30",n:"Neo Park",d:"<span class=warn>入口先買鳥飼料、多買幾杯</span>,紅鶴孔雀放養。17:30閉園",lat:26.61066,lng:127.99152},
+{t:"18:30",n:"21世紀之森公園(宿名護)",d:"飯後帶女兒跑跑,開到21:00。住宿首選Yugaf Inn(公園旁)",lat:26.59178,lng:127.97098}]},
+{label:"Day 3",date:"8/26(三)",title:"北部主力→折返中部",route:"名護 → 本部 → 恩納 → 北谷(宿)",color:"#378ADD",stops:[
+{t:"08:30",n:"美麗海水族館+園內遊具區",d:"開門進場。<span class=warn>11:00後戶外遊具燙,11:30前撤</span>。許田道之駅買優惠票",lat:26.69434,lng:127.87801},
+{t:"11:45",n:"本部そば街道 午餐",d:"<span class=warn>きしもと食堂週三公休(8/26正是週三)</span>,改其他家並先查公休日",lat:26.66033,lng:127.89589},
+{t:"14:00",n:"Kariyushi Water Land【第二場】",d:"4歲以上。<span class=warn>非住客資格電話驗證=關鍵路徑</span>。玩完車上午睡80分",lat:26.52622,lng:127.93002},
+{t:"19:00",n:"Round 1宜野灣(D3/D4擇一)",d:"平日10:00–翌6:00。部分項目身高限制現場分流",lat:26.27580,lng:127.73104}]},
+{label:"Day 4",date:"8/27(四)",title:"南下收尾:還車日",route:"北谷 → 浦添 → 豐崎 → 國際通(宿)",color:"#D85A30",stops:[
+{t:"09:30",n:"浦添大公園",d:"<span class=warn>滾輪長滑梯偶有維修封閉,出發前查官網</span>;封閉改Round 1晨間案(10:00開)。滑梯燙限早上、帶墊板",lat:26.25010,lng:127.72869},
+{t:"12:00",n:"iias豐崎 午餐+DMM水族館",d:"DMM 14:00進館,門票先網購",lat:26.15639,lng:127.65068},
+{t:"16:40",n:"OTS臨空豐崎 17:00還車",d:"對面加油站加滿再還。<span class=warn>最終還車18:30</span>。Jumbo taxi前一天預約",lat:26.15883,lng:127.65440},
+{t:"18:00",n:"國際通 晚餐夜逛(宿)",d:"民謠居酒屋/屋台村。飯店判準:近縣廳前站+退房後寄行李",lat:26.21515,lng:127.68475}]},
+{label:"Day 5",date:"8/28(五)",title:"回程日",route:"國際通 → 博物館 → 機場",color:"#9aa3ad",stops:[
+{t:"09:30",n:"縣立博物館・美術館",d:"週五9:00–20:00。行李寄飯店,單軌縣廳前⇄おもろまち。兒童體驗室先領整理券",lat:26.22731,lng:127.69385},
+{t:"13:45",n:"那霸機場",d:"JX871 15:50起飛。國際線櫃檯排隊抓30分,保險12:45出發",lat:26.20013,lng:127.64665}]}
+];
+const NIGHT=[{elementType:"geometry",stylers:[{color:"#242f3e"}]},{elementType:"labels.text.stroke",stylers:[{color:"#242f3e"}]},{elementType:"labels.text.fill",stylers:[{color:"#746855"}]},{featureType:"administrative.locality",elementType:"labels.text.fill",stylers:[{color:"#d59563"}]},{featureType:"poi",elementType:"labels.text.fill",stylers:[{color:"#d59563"}]},{featureType:"poi.park",elementType:"geometry",stylers:[{color:"#263c3f"}]},{featureType:"poi.park",elementType:"labels.text.fill",stylers:[{color:"#6b9a76"}]},{featureType:"road",elementType:"geometry",stylers:[{color:"#38414e"}]},{featureType:"road",elementType:"geometry.stroke",stylers:[{color:"#212a37"}]},{featureType:"road",elementType:"labels.text.fill",stylers:[{color:"#9ca5b3"}]},{featureType:"road.highway",elementType:"geometry",stylers:[{color:"#746855"}]},{featureType:"road.highway",elementType:"geometry.stroke",stylers:[{color:"#1f2835"}]},{featureType:"road.highway",elementType:"labels.text.fill",stylers:[{color:"#f3d19c"}]},{featureType:"transit",elementType:"geometry",stylers:[{color:"#2f3948"}]},{featureType:"transit.station",elementType:"labels.text.fill",stylers:[{color:"#d59563"}]},{featureType:"water",elementType:"geometry",stylers:[{color:"#17263c"}]},{featureType:"water",elementType:"labels.text.fill",stylers:[{color:"#515c6d"}]}];
+let map,dirService,current=0,overlays=[],routeCache={},info;
+function init(){
+  map=new google.maps.Map(document.getElementById('map'),{center:{lat:26.42,lng:127.82},zoom:10,styles:NIGHT,mapTypeControl:false,streetViewControl:false,fullscreenControl:true});
+  dirService=new google.maps.DirectionsService();
+  info=new google.maps.InfoWindow();
+  const tabs=document.getElementById('tabs');
+  DAYS.forEach((d,i)=>{const b=document.createElement('button');b.className='chip';b.textContent=d.label;b.setAttribute('role','tab');b.onclick=()=>show(i);tabs.appendChild(b);});
+  show(0);
+}
+function navUrl(d){
+  const pts=d.stops.map(s=>s.lat+','+s.lng);
+  const way=pts.slice(1,-1).join('|');
+  return 'https://www.google.com/maps/dir/?api=1&origin='+pts[0]+'&destination='+pts[pts.length-1]+(way?'&waypoints='+encodeURIComponent(way):'')+'&travelmode=driving';
+}
+function clearOverlays(){overlays.forEach(o=>o.setMap(null));overlays=[];}
+function show(i){
+  current=i;const d=DAYS[i];
+  [...document.getElementById('tabs').children].forEach((c,j)=>c.classList.toggle('on',j===i));
+  document.getElementById('day-eyebrow').textContent='DAY '+(i+1)+'・'+d.date;
+  document.getElementById('day-title').textContent=d.title;
+  document.getElementById('day-route').textContent=d.route;
+  document.getElementById('nav-link').href=navUrl(d);
+  const box=document.getElementById('stops');box.innerHTML='';
+  clearOverlays();
+  const bounds=new google.maps.LatLngBounds();
+  d.stops.forEach((s,k)=>{
+    const pos={lat:s.lat,lng:s.lng};bounds.extend(pos);
+    const m=new google.maps.Marker({position:pos,map:map,label:{text:String(k+1),color:'#fff',fontWeight:'700',fontSize:'12px'},icon:{path:google.maps.SymbolPath.CIRCLE,scale:13,fillColor:d.color,fillOpacity:1,strokeColor:'#ffffff',strokeWeight:2}});
+    m.addListener('click',()=>{info.setContent('<div style="color:#222;font-size:13px;max-width:240px"><b>'+s.n+'</b><br>'+s.t+'・'+s.d+'</div>');info.open(map,m);});
+    overlays.push(m);
+    const card=document.createElement('div');card.className='stop';
+    card.innerHTML='<div class="badge" style="background:'+d.color+'">'+(k+1)+'</div><div><div class="t">'+s.t+'</div><div class="n">'+s.n+'</div><div class="d">'+s.d+'</div></div>';
+    card.onclick=()=>{map.panTo(pos);map.setZoom(14);google.maps.event.trigger(m,'click');};
+    box.appendChild(card);
+  });
+  map.fitBounds(bounds,60);
+  drawRoute(d,i);
+}
+function drawRoute(d,i){
+  const renderPath=(path)=>{
+    if(current!==i)return;
+    const halo=new google.maps.Polyline({path,strokeColor:'#ffffff',strokeOpacity:.9,strokeWeight:7,map});
+    const line=new google.maps.Polyline({path,strokeColor:d.color,strokeOpacity:.95,strokeWeight:4,map});
+    overlays.push(halo,line);
+  };
+  if(routeCache[i]){renderPath(routeCache[i]);return;}
+  const pts=d.stops.map(s=>({lat:s.lat,lng:s.lng}));
+  dirService.route({
+    origin:pts[0],destination:pts[pts.length-1],
+    waypoints:pts.slice(1,-1).map(p=>({location:p,stopover:true})),
+    travelMode:google.maps.TravelMode.DRIVING
+  },(res,status)=>{
+    if(status==='OK'&&res.routes[0]){
+      routeCache[i]=res.routes[0].overview_path;
+      renderPath(routeCache[i]);
+    }else{
+      console.warn('Directions失敗:',status,'→ 退回示意直線。若為REQUEST_DENIED,到Cloud Console啟用Directions API');
+      if(current!==i)return;
+      const line=new google.maps.Polyline({path:pts,strokeColor:d.color,strokeOpacity:.7,strokeWeight:3,icons:[{icon:{path:'M 0,-1 0,1',strokeOpacity:1,scale:3},offset:'0',repeat:'14px'}],map});
+      line.setOptions({strokeOpacity:0});
+      overlays.push(line);
+    }
+  });
+}
+const sc=document.createElement('script');
+sc.src='https://maps.googleapis.com/maps/api/js?key='+API_KEY+'&language=zh-TW&region=JP&callback=init';
+sc.async=true;document.head.appendChild(sc);
+</script>
+</body>
+</html>
